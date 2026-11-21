@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DNS Lookup Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e8edf2; --surface:#ffffff; --ink:#14213d; --muted:#5a6a80; --line:#cdd6e0;
+  --accent:#0b7a75; --accent-ink:#ffffff; --chip:#dbe5ee; --chip-on:#14213d; --chip-on-ink:#ffffff;
+  --ok:#17703f; --ok-bg:#d9f0e3; --warn:#8a5200; --warn-bg:#fbebcf; --bad:#a3211a; --bad-bg:#f9dcd9; --neutral-bg:#e3e9f0;
+  --sans:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1724; --surface:#17212f; --ink:#e6edf5; --muted:#92a3b8; --line:#2a384b;
+    --accent:#3fc1b9; --accent-ink:#06211f; --chip:#223044; --chip-on:#e6edf5; --chip-on-ink:#0f1724;
+    --ok:#6fdc9f; --ok-bg:#16382a; --warn:#f2c26b; --warn-bg:#3a2d12; --bad:#ff9a92; --bad-bg:#3d1c1a; --neutral-bg:#223044;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1724; --surface:#17212f; --ink:#e6edf5; --muted:#92a3b8; --line:#2a384b;
+  --accent:#3fc1b9; --accent-ink:#06211f; --chip:#223044; --chip-on:#e6edf5; --chip-on-ink:#0f1724;
+  --ok:#6fdc9f; --ok-bg:#16382a; --warn:#f2c26b; --warn-bg:#3a2d12; --bad:#ff9a92; --bad-bg:#3d1c1a; --neutral-bg:#223044;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;padding:clamp(16px,4vw,48px) 16px 64px}
+main{max-width:980px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:28px}
+h1{font-size:clamp(2rem,6vw,3.4rem);line-height:1.02;margin:0;font-weight:700;letter-spacing:-.02em}
+.sub{color:var(--muted);margin:8px 0 0;max-width:46ch}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 12px}
+.ghost:hover{background:var(--neutral-bg)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+.searchrow{display:flex;gap:10px;flex-wrap:wrap}
+.searchrow input{flex:1 1 280px;min-width:0;font-family:var(--mono);font-size:1.05rem;padding:14px 16px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
+.go{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:14px 28px;font-weight:700;font-size:1.05rem}
+.go:disabled{opacity:.6;cursor:progress}
+.hint{color:var(--muted);font-size:.9rem;margin:8px 2px 0}
+fieldset{border:0;padding:0;margin:20px 0 0}
+legend{font-weight:700;padding:0;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.chip span{display:inline-block;padding:5px 12px;border-radius:999px;background:var(--chip);font-family:var(--mono);font-size:.88rem;border:1px solid transparent}
+.chip input:checked+span{background:var(--chip-on);color:var(--chip-on-ink)}
+.chip input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+.presets{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.opts{display:flex;flex-wrap:wrap;gap:16px 28px;margin-top:20px;align-items:end}
+.opts label{display:flex;flex-direction:column;gap:4px;font-weight:500;font-size:.92rem}
+.opts select,.opts input[type=text]{padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);min-width:190px}
+.opts .check{flex-direction:row;align-items:center;gap:8px}
+.opts .check input{width:18px;height:18px;accent-color:var(--accent)}
+#custom{font-family:var(--mono);min-width:280px}
+.history{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:.9rem}
+.history button{border:1px solid var(--line);background:transparent;border-radius:6px;padding:2px 9px;font-family:var(--mono);font-size:.82rem}
+.history button:hover{background:var(--neutral-bg)}
+.toolbar{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:32px 0 12px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:7px 16px}
+.seg button[aria-pressed=true]{background:var(--chip-on);color:var(--chip-on-ink)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.domain{margin-bottom:18px}
+.domain>h2{font-family:var(--mono);font-size:1.15rem;margin:0 0 8px;font-weight:500;word-break:break-all}
+.domain>h2 small{color:var(--muted);font-family:var(--sans);font-size:.85rem;margin-left:8px}
+.block{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.bhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+.bhead b{font-family:var(--mono);min-width:64px}
+.pill{font-size:.78rem;padding:2px 9px;border-radius:999px;font-weight:700;background:var(--neutral-bg)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.ms{margin-left:auto;color:var(--muted);font-size:.82rem;font-family:var(--mono)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:.9rem}
+th{text-align:left;color:var(--muted);font-family:var(--sans);font-weight:500;font-size:.8rem;padding:8px 14px}
+td{padding:8px 14px;border-top:1px solid var(--line);vertical-align:top}
+td.val{word-break:break-word;min-width:220px}
+.empty{padding:12px 14px;color:var(--muted);font-size:.92rem}
+pre{margin:0;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:auto;font-family:var(--mono);font-size:.88rem;white-space:pre-wrap;word-break:break-word}
+.error{background:var(--bad-bg);color:var(--bad);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.placeholder{color:var(--muted);text-align:center;padding:48px 0}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--chip-on);color:var(--chip-on-ink);padding:8px 16px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Siddhant DNS Lookup</h1>
+      <p class="sub">Query any record type, check DNSSEC, and run reverse lookups from one window.</p>
+    </div>
+    <button class="ghost" id="theme" type="button" aria-label="Switch theme">Theme</button>
+  </header>
+
+  <section class="panel" aria-label="Lookup form">
+    <div class="searchrow">
+      <input id="q" type="text" placeholder="example.com, 8.8.8.8, or several separated by spaces" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Domain or IP address" autofocus>
+      <button class="go" id="go" type="button">Look up</button>
+    </div>
+    <p class="hint">Enter an IP address to run a reverse (PTR) lookup automatically. Add more names to query them in parallel.</p>
+
+    <fieldset>
+      <legend>Record types</legend>
+      <div class="chips" id="types"></div>
+      <div class="presets">
+        <button class="ghost" type="button" data-preset="common">Common</button>
+        <button class="ghost" type="button" data-preset="mail">Email</button>
+        <button class="ghost" type="button" data-preset="dnssec">DNSSEC</button>
+        <button class="ghost" type="button" data-preset="all">Select all</button>
+        <button class="ghost" type="button" data-preset="none">Clear</button>
+      </div>
+    </fieldset>
+
+    <div class="opts">
+      <label>Resolver
+        <select id="resolver">
+          <option value="https://cloudflare-dns.com/dns-query">Cloudflare (1.1.1.1)</option>
+          <option value="https://dns.google/resolve">Google (8.8.8.8)</option>
+          <option value="custom">Custom DoH JSON URL…</option>
+        </select>
+      </label>
+      <label id="customWrap" hidden>Custom URL
+        <input type="text" id="custom" placeholder="https://resolver.example/dns-query">
+      </label>
+      <label class="check"><input type="checkbox" id="dnssec" checked> Validate DNSSEC</label>
+    </div>
+
+    <div class="history" id="history" hidden></div>
+  </section>
+
+  <div class="toolbar" id="toolbar" hidden>
+    <div class="seg" role="group" aria-label="Output format">
+      <button type="button" data-view="table" aria-pressed="true">Table</button>
+      <button type="button" data-view="short" aria-pressed="false">Values only</button>
+      <button type="button" data-view="json" aria-pressed="false">JSON</button>
+    </div>
+    <div class="actions">
+      <button class="ghost" type="button" id="copy">Copy</button>
+      <button class="ghost" type="button" id="dlJson">Save JSON</button>
+      <button class="ghost" type="button" id="dlCsv">Save CSV</button>
+    </div>
+  </div>
+
+  <section id="out" aria-live="polite"><div class="placeholder">Results will appear here.</div></section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SOA','CAA','SRV','PTR','DS','DNSKEY','HTTPS','TLSA','NAPTR'];
+const PRESETS = {
+  common:['A','AAAA','MX','NS','TXT'], mail:['MX','TXT','CAA'], dnssec:['DS','DNSKEY','SOA','NS'],
+  all:TYPES, none:[]
+};
+const NUM = {1:'A',2:'NS',5:'CNAME',6:'SOA',12:'PTR',15:'MX',16:'TXT',28:'AAAA',33:'SRV',35:'NAPTR',43:'DS',46:'RRSIG',47:'NSEC',48:'DNSKEY',50:'NSEC3',52:'TLSA',64:'SVCB',65:'HTTPS',257:'CAA'};
+const RCODE = {0:'NOERROR',1:'FORMERR',2:'SERVFAIL',3:'NXDOMAIN',4:'NOTIMP',5:'REFUSED'};
+
+const $ = s => document.querySelector(s);
+let view = 'table', data = [];
+
+function h(tag, attrs, ...kids){
+  const el = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs || {})) {
+    if (k === 'class') el.className = v; else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null) el.append(kid);
+  return el;
+}
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+/* ---------- setup ---------- */
+$('#types').append(...TYPES.map(t =>
+  h('label', {class:'chip'}, h('input', {type:'checkbox', value:t}), h('span', {}, t))));
+function setTypes(list){ document.querySelectorAll('#types input').forEach(i => i.checked = list.includes(i.value)); }
+setTypes(PRESETS.common);
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => setTypes(PRESETS[b.dataset.preset]));
+$('#resolver').onchange = e => { $('#customWrap').hidden = e.target.value !== 'custom'; };
+$('#q').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+$('#go').onclick = run;
+
+$('#theme').onclick = () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme:dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+};
+
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
+  view = b.dataset.view;
+  document.querySelectorAll('[data-view]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  render();
+});
+
+/* ---------- history ---------- */
+function loadHistory(){ try { return JSON.parse(localStorage.getItem('sdl-history') || '[]'); } catch { return []; } }
+function saveHistory(q){
+  try {
+    const list = [q, ...loadHistory().filter(x => x !== q)].slice(0, 8);
+    localStorage.setItem('sdl-history', JSON.stringify(list));
+  } catch {}
+  showHistory();
+}
+function showHistory(){
+  const list = loadHistory(), box = $('#history');
+  box.hidden = !list.length; box.replaceChildren();
+  if (!list.length) return;
+  box.append('Recent:');
+  list.forEach(q => box.append(h('button', {type:'button'}, q)));
+  box.querySelectorAll('button').forEach(b => b.onclick = () => { $('#q').value = b.textContent; run(); });
+}
+showHistory();
+
+/* ---------- DNS ---------- */
+function cleanName(s){
+  return s.trim().toLowerCase().replace(/^[a-z]+:\/\//, '').split(/[\/?#]/)[0].replace(/\.$/, '');
+}
+function isIPv4(s){ return /^\d{1,3}(\.\d{1,3}){3}$/.test(s) && s.split('.').every(n => +n <= 255); }
+function isIPv6(s){ return s.includes(':') && /^[0-9a-f:]+$/i.test(s); }
+function toPtr(s){
+  if (isIPv4(s)) return s.split('.').reverse().join('.') + '.in-addr.arpa';
+  const parts = s.split('::');
+  if (parts.length > 2) return null;
+  const a = parts[0] ? parts[0].split(':') : [];
+  let full = a;
+  if (parts.length === 2) {
+    const b = parts[1] ? parts[1].split(':') : [];
+    full = [...a, ...Array(8 - a.length - b.length).fill('0'), ...b];
+  }
+  if (full.length !== 8) return null;
+  return full.map(g => g.padStart(4, '0')).join('').split('').reverse().join('.') + '.ip6.arpa';
+}
+
+function resolverBase(){
+  const v = $('#resolver').value;
+  return v === 'custom' ? $('#custom').value.trim() : v;
+}
+const BUILTIN = ['https://cloudflare-dns.com/dns-query', 'https://dns.google/resolve'];
+async function doh(base, name, type, dnssec, cd){
+  const u = new URL(base);
+  u.searchParams.set('name', name); u.searchParams.set('type', type);
+  if (dnssec) u.searchParams.set('do', '1');
+  if (cd) u.searchParams.set('cd', '1');
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 8000);
+  const t0 = performance.now();
+  try {
+    const r = await fetch(u, {headers:{accept:'application/dns-json'}, signal:ctl.signal});
+    if (!r.ok) throw new Error('Resolver ' + u.host + ' answered with HTTP ' + r.status);
+    const j = await r.json();
+    j._ms = Math.round(performance.now() - t0);
+    j._via = base;
+    return j;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Resolver ' + u.host + ' took too long to answer');
+    if (e instanceof TypeError) throw new Error('Could not reach ' + u.host + ' (you may be offline, a firewall or extension may be blocking it, or the page is running inside a sandboxed preview — open the saved file directly in your browser)');
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+// Try the chosen resolver first, then fall back to the built-in ones.
+async function dohAny(base, name, type, dnssec, cd){
+  const order = [base, ...BUILTIN.filter(b => b !== base)];
+  let first;
+  for (const b of order) {
+    try { return await doh(b, name, type, dnssec, cd); }
+    catch (e) { first = first || e; }
+  }
+  throw first;
+}
+async function lookup(base, name, type, dnssec){
+  try {
+    const j = await dohAny(base, name, type, dnssec, false);
+    let sec = null;
+    if (dnssec) {
+      if (j.AD) sec = 'secure';
+      else if (j.Status === 2) {
+        // Retry with checking disabled: if that works, validation was the problem.
+        try { const c = await doh(j._via, name, type, true, true); sec = c.Status === 0 ? 'bogus' : 'unknown'; }
+        catch { sec = 'unknown'; }
+      }
+      else sec = j.Status === 0 ? 'insecure' : 'unknown';
+    }
+    const answers = (j.Answer || []).map(a => ({
+      name: a.name, type: NUM[a.type] || 'TYPE' + a.type, ttl: a.TTL, value: a.data
+    }));
+    return {type, rcode: RCODE[j.Status] ?? String(j.Status), ms: j._ms, via: new URL(j._via).host, security: sec,
+            answers: answers.filter(a => a.type !== 'RRSIG'), rrsigs: answers.length - answers.filter(a => a.type !== 'RRSIG').length};
+  } catch (e) {
+    return {type, error: e.message || String(e)};
+  }
+}
+
+async function run(){
+  const names = $('#q').value.split(/[\s,]+/).map(cleanName).filter(Boolean);
+  if (!names.length) { toast('Enter a domain or IP address'); return; }
+  const types = [...document.querySelectorAll('#types input:checked')].map(i => i.value);
+  const base = resolverBase();
+  if (!base) { toast('Enter a custom resolver URL'); return; }
+  try { new URL(base); } catch { toast('That resolver URL isn’t valid'); return; }
+  const dnssec = $('#dnssec').checked;
+
+  const jobs = [];
+  for (const raw of names) {
+    const isIp = isIPv4(raw) || isIPv6(raw);
+    if (isIp) {
+      const ptr = toPtr(raw);
+      jobs.push(ptr ? {input:raw, name:ptr, types:['PTR'], reverse:true} : {input:raw, bad:'Not a valid IP address'});
+    } else if (!types.length) {
+      jobs.push({input:raw, bad:'Pick at least one record type'});
+    } else jobs.push({input:raw, name:raw, types});
+  }
+
+  $('#go').disabled = true; $('#go').textContent = 'Looking up…';
+  try {
+    data = await Promise.all(jobs.map(async job => {
+      if (job.bad) return {input:job.input, error:job.bad};
+      const results = await Promise.all(job.types.map(t => lookup(base, job.name, t, dnssec)));
+      return {input:job.input, query:job.name, reverse:!!job.reverse, resolver:base, results};
+    }));
+    saveHistory(names.join(' '));
+  } finally {
+    $('#go').disabled = false; $('#go').textContent = 'Look up';
+  }
+  $('#toolbar').hidden = false;
+  render();
+}
+
+/* ---------- output ---------- */
+const secPill = s => !s ? null : h('span', {class:'pill ' + ({secure:'ok',insecure:'',bogus:'bad',unknown:'warn'}[s])}, 'DNSSEC ' + s);
+function rcodePill(r){
+  return h('span', {class:'pill ' + (r === 'NOERROR' ? 'ok' : r === 'NXDOMAIN' ? 'warn' : 'bad')}, r);
+}
+
+function render(){
+  const out = $('#out'); out.replaceChildren();
+  if (!data.length) return;
+  if (view === 'json') { out.append(h('pre', {}, toJSON())); return; }
+  if (view === 'short') { out.append(h('pre', {}, toShort() || 'No records returned.')); return; }
+
+  for (const d of data) {
+    if (d.error) { out.append(h('div', {class:'error'}, d.input + ': ' + d.error)); continue; }
+    const dom = h('div', {class:'domain'},
+      h('h2', {}, d.input, d.reverse ? h('small', {}, 'reverse lookup of ' + d.query) : null));
+    for (const r of d.results) {
+      const head = h('div', {class:'bhead'}, h('b', {}, r.type));
+      let body;
+      if (r.error) {
+        head.append(h('span', {class:'pill bad'}, 'FAILED'));
+        body = h('div', {class:'error', style:'margin:10px 14px'}, r.error);
+      } else {
+        head.append(rcodePill(r.rcode));
+        if (r.security) head.append(secPill(r.security));
+        head.append(h('span', {class:'ms'}, r.ms + ' ms · ' + r.via));
+        if (!r.answers.length) body = h('div', {class:'empty'},
+          r.rcode === 'NXDOMAIN' ? 'This name does not exist.' : 'No ' + r.type + ' records found.');
+        else body = h('div', {class:'scroll'}, h('table', {},
+          h('thead', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Type'), h('th', {}, 'TTL'), h('th', {}, 'Value'))),
+          h('tbody', {}, r.answers.map(a => h('tr', {},
+            h('td', {}, a.name), h('td', {}, a.type), h('td', {}, String(a.ttl)), h('td', {class:'val'}, a.value))))));
+      }
+      dom.append(h('div', {class:'block'}, head, body));
+    }
+    out.append(dom);
+  }
+}
+
+function toJSON(){ return JSON.stringify(data, null, 2); }
+function toShort(){
+  const lines = [];
+  for (const d of data) for (const r of d.results || []) for (const a of r.answers || []) lines.push(a.value);
+  return lines.join('\n');
+}
+function toCsv(){
+  const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const rows = [['query','record_type','name','ttl','value','rcode','dnssec']];
+  for (const d of data) for (const r of d.results || [])
+    for (const a of r.answers || []) rows.push([d.query, a.type, a.name, a.ttl, a.value, r.rcode, r.security || '']);
+  return rows.map(r => r.map(q).join(',')).join('\n');
+}
+function download(name, text, mime){
+  const a = h('a', {href:URL.createObjectURL(new Blob([text], {type:mime})), download:name});
+  document.body.append(a); a.click(); a.remove();
+}
+$('#copy').onclick = async () => {
+  const text = view === 'json' ? toJSON() : toShort();
+  try { await navigator.clipboard.writeText(text); toast(view === 'json' ? 'JSON copied' : 'Values copied'); }
+  catch { toast('Couldn’t copy — select the text manually'); }
+};
+$('#dlJson').onclick = () => download('dns-results.json', toJSON(), 'application/json');
+$('#dlCsv').onclick = () => download('dns-results.csv', toCsv(), 'text/csv');
+</script>
+</body>
+</html>
